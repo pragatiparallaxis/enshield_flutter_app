@@ -546,97 +546,99 @@ class _WorkOrderViewState extends State<WorkOrderView> {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.white24),
               ),
-              child: DropdownButtonFormField<WorkOrderItem>(
-                value: currentSelectedItem,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                ),
-                dropdownColor: const Color(0xFF1E1E2E),
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-                isExpanded: true,
-                items: items.map((item) {
-                  final stageInfo = _getCurrentStageInfo(item);
-                  final currentStage = stageInfo['stage'] as String;
-                  final stageColor = stageInfo['color'] as Color;
-                  return DropdownMenuItem<WorkOrderItem>(
-                    value: item,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            "${item.color} ${item.category} - Size ${item.size}",
-                            style: const TextStyle(color: Colors.white),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: stageColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: stageColor.withOpacity(0.5),
-                            ),
-                          ),
-                          child: Text(
-                            currentStage.toUpperCase(),
-                            style: TextStyle(
-                              color: stageColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-                onChanged: (WorkOrderItem? newItem) {
-                  setState(() {
-                    selectedItem = newItem;
-                  });
-                },
-                selectedItemBuilder: (BuildContext context) {
-                  return items.map((item) {
-                    final stageInfo = _getCurrentStageInfo(item);
-                    final currentStage = stageInfo['stage'] as String;
-                    final stageColor = stageInfo['color'] as Color;
-                    return Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            "${item.color} ${item.category} - Size ${item.size}",
-                            style: const TextStyle(color: Colors.white),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: stageColor.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: stageColor.withOpacity(0.5),
-                            ),
-                          ),
-                          child: Text(
-                            currentStage.toUpperCase(),
-                            style: TextStyle(
-                              color: stageColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList();
-                },
+             child: DropdownButtonFormField<String>(
+  value: selectedItem?.id,
+  decoration: const InputDecoration(
+    border: InputBorder.none,
+    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+  ),
+  dropdownColor: const Color(0xFF1E1E2E),
+  style: const TextStyle(color: Colors.white, fontSize: 14),
+  icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+  isExpanded: true,
+
+  items: items.map((item) {
+    final stageInfo = _getCurrentStageInfo(item);
+    final currentStage = stageInfo['stage'] as String;
+    final stageColor = stageInfo['color'] as Color;
+
+    return DropdownMenuItem<String>(
+      value: item.id,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              "${item.color} ${item.category} - Size ${item.size}",
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: stageColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: stageColor.withOpacity(0.5)),
+            ),
+            child: Text(
+              currentStage.toUpperCase(),
+              style: TextStyle(
+                color: stageColor,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }).toList(),
+
+  onChanged: (newId) {
+    setState(() {
+      selectedItem = items.firstWhere((i) => i.id == newId);
+    });
+  },
+
+  selectedItemBuilder: (BuildContext context) {
+    return items.map((item) {
+      final stageInfo = _getCurrentStageInfo(item);
+      final currentStage = stageInfo['stage'] as String;
+      final stageColor = stageInfo['color'] as Color;
+
+      return Row(
+        children: [
+          Expanded(
+            child: Text(
+              "${item.color} ${item.category} - Size ${item.size}",
+              style: const TextStyle(color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: stageColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: stageColor.withOpacity(0.5)),
+            ),
+            child: Text(
+              currentStage.toUpperCase(),
+              style: TextStyle(
+                color: stageColor,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      );
+    }).toList();
+  },
+), // 👈 THIS ')' FIXES YOUR ERRORS
+          
             ),
             const SizedBox(height: 16),
             // Display selected item's details and stages
@@ -950,10 +952,10 @@ class _WorkOrderViewState extends State<WorkOrderView> {
                     Colors.green,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 Expanded(
                   child: _buildQuantityBox(
-                    "Rejected",
+                    "Reject",
                     _getRejectedQuantity(stageStatus, stageData),
                     Colors.red,
                   ),
@@ -1079,94 +1081,111 @@ class _WorkOrderViewState extends State<WorkOrderView> {
                   ),
                 ],
               )
-            else ...[
-              // Assign Workers button (for pending/assigned stages)
-              if (stageStatus == 'pending' || stageStatus == 'assigned')
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      // If stage doesn't exist, we'll create it via the API
-                      final stageId = stageData?.id ?? 'new';
-                      final inputQty = stageData?.input_quantity ?? previousStageOutput;
-                      final stageOrder = _getStageOrder(stageName);
-                      
-                      await showDialog(
-                        context: Get.context!,
-                        builder: (context) => AssignWorkersModal(
-                          workOrderId: widget.workOrderId,
-                          stageId: stageId.toString(),
-                          workOrderItemId: item.id.toString(),
-                          stageName: stageName,
-                          inputQuantity: inputQty,
-                          stageOrder: stageOrder,
-                          onSuccess: () => controller.refresh(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.person_add, size: 18),
-                    label: const Text("Assign Workers"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFF9800),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                ),
-              // View Submissions button (for submitted stages)
-              if (stageStatus == 'submitted')
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      if (stageData == null) {
-                        Get.snackbar(
-                          "Error",
-                          "Stage data not found",
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.red.shade100,
-                        );
-                        return;
-                      }
-                      await Get.to(() => StageSubmissionsView(
-                            workOrderId: widget.workOrderId,
-                            stageId: stageData.id.toString(),
-                            stageName: stageName,
-                            onSuccess: () => controller.refresh(),
-                          ));
-                    },
-                    icon: const Icon(Icons.visibility, size: 18),
-                    label: const Text("View Submissions"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                  ),
-                ),
-              // Complete Stage button (for assigned stages - legacy, now handled via submissions)
-              if (stageStatus == 'assigned')
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: borderColor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'Complete Stage',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-            ],
-          ],
+         else ...[
+  // 🔶 Assign Workers + Complete Stage (for pending/assigned stages)
+  if (stageStatus == 'pending' || stageStatus == 'assigned') ...[
+    
+    // Assign Workers
+    Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          final stageId = stageData?.id ?? 'new';
+          final inputQty = stageData?.input_quantity ?? previousStageOutput;
+          final stageOrder = _getStageOrder(stageName);
+
+          await showDialog(
+            context: Get.context!,
+            builder: (context) => AssignWorkersModal(
+              workOrderId: widget.workOrderId,
+              stageId: stageId.toString(),
+              workOrderItemId: item.id.toString(),
+              stageName: stageName,
+              inputQuantity: inputQty,
+              stageOrder: stageOrder,
+              onSuccess: () => controller.refresh(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.person_add, size: 18),
+        label: const Text("Assign Workers"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFFF9800),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+      ),
+    ),
+
+    // 🟩 NEW: Complete Stage button BELOW Assign Workers
+    Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ElevatedButton(
+        onPressed: () async {
+          await showDialog(
+            context: Get.context!,
+            builder: (context) => CompleteStageModal(
+              workOrderId: widget.workOrderId,
+              workOrderItem: item,
+              stageName: stageName,
+              stageOrder: _getStageOrder(stageName),
+              onSuccess: () => controller.refresh(),
+              existingStageData: stageData,
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+        child: const Text(
+          "Complete Stage",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ),
+    ),
+  ],
+
+  // 🟠 View Submissions (submitted state)
+  if (stageStatus == 'submitted')
+    Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          if (stageData == null) {
+            Get.snackbar(
+              "Error",
+              "Stage data not found",
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: Colors.red.shade100,
+            );
+            return;
+          }
+          await Get.to(() => StageSubmissionsView(
+                workOrderId: widget.workOrderId,
+                stageId: stageData!.id.toString(),
+                stageName: stageName,
+                onSuccess: () => controller.refresh(),
+              ));
+        },
+        icon: const Icon(Icons.visibility, size: 18),
+        label: const Text("View Submissions"),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.orange,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+        ),
+      ),
+    ),
+]
+       ],
         ),
       ),
     );

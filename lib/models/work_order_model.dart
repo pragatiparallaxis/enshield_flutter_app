@@ -76,33 +76,29 @@ class WorkOrder {
 }
 
 class WorkOrderItem {
-  final int id;
-  final WorkOrderCategory? category;
+  final String id;
+  final String category;   // 👈 change
   final String color;
-  final Size? size;
+  final String size;       // 👈 change
   final int quantity;
   final List<WorkOrderStage>? work_order_stages;
 
   WorkOrderItem({
     required this.id,
-    this.category,
+    required this.category,
     required this.color,
-    this.size,
+    required this.size,
     required this.quantity,
     this.work_order_stages,
   });
 
   factory WorkOrderItem.fromJson(Map<String, dynamic> json) {
     return WorkOrderItem(
-      id: _parseInt(json['id']),
-      category: json['category_id'] is Map 
-          ? WorkOrderCategory.fromJson(json['category_id']) 
-          : (json['category'] is Map ? WorkOrderCategory.fromJson(json['category']) : null),
+      id: json['id'].toString(),
+      category: json['category']?.toString() ?? '',
       color: json['color']?.toString() ?? '',
-      size: json['size_id'] is Map 
-          ? Size.fromJson(json['size_id']) 
-          : (json['size'] is Map ? Size.fromJson(json['size']) : null),
-      quantity: _parseInt(json['quantity']),
+      size: json['size']?.toString() ?? '',
+      quantity: int.tryParse(json['quantity'].toString()) ?? 0,
       work_order_stages: (json['work_order_stages'] as List?)
           ?.map((item) => WorkOrderStage.fromJson(item))
           .toList(),
@@ -112,11 +108,12 @@ class WorkOrderItem {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'category_id': category?.toJson(),
+      'category': category,   // 👈 now correct
       'color': color,
-      'size_id': size?.toJson(),
+      'size': size,
       'quantity': quantity,
-      'work_order_stages': work_order_stages?.map((item) => item.toJson()).toList(),
+      'work_order_stages':
+          work_order_stages?.map((item) => item.toJson()).toList(),
     };
   }
 }

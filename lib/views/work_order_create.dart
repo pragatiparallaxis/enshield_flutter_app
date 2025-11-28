@@ -51,11 +51,7 @@ class CreateWorkOrderView extends StatelessWidget {
               _textField("Title *", controller.updateTitle),
               const SizedBox(height: 15),
 
-              _textField(
-                "Planned Quantity (Optional)",
-                controller.updatePlannedQty,
-                inputType: TextInputType.number,
-              ),
+             
               const SizedBox(height: 15),
 
               _textField(

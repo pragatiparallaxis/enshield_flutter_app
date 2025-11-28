@@ -194,71 +194,101 @@ class _CompleteStageModalState extends State<CompleteStageModal> {
     );
   }
 
-  Future<void> _submit() async {
-    if (_formKey.currentState!.validate()) {
-      final inputQty = int.parse(_inputQuantityController.text);
-      final outputQty = int.parse(_outputQuantityController.text);
-      final rejectedQty = int.parse(_rejectedQuantityController.text);
+Future<void> _submit() async {
+  if (_formKey.currentState!.validate()) {
+    final inputQty = int.parse(_inputQuantityController.text);
+    final outputQty = int.parse(_outputQuantityController.text);
+    final rejectedQty = int.parse(_rejectedQuantityController.text);
 
-      if (outputQty + rejectedQty > inputQty) {
-        Get.snackbar("Error", "Output + Rejected cannot exceed Input quantity",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red.shade100);
-        return;
-      }
+    if (outputQty + rejectedQty > inputQty) {
+      Get.snackbar("Error", "Output + Rejected cannot exceed Input quantity",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
+      return;
+    }
 
-      final totalAssigned = _getTotalAssigned();
-      if (_workerAssignments.isNotEmpty && totalAssigned > outputQty) {
-        Get.snackbar("Error", "Total worker assignments cannot exceed output quantity",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red.shade100);
-        return;
-      }
+    final totalAssigned = _getTotalAssigned();
+    if (_workerAssignments.isNotEmpty && totalAssigned > outputQty) {
+      Get.snackbar("Error", "Total worker assignments cannot exceed output quantity",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
+      return;
+    }
 
-      setState(() => _isSubmitting = true);
+    setState(() => _isSubmitting = true);
 
-      try {
-        final workerAssignments = _workerAssignments
-            .where((wa) => wa['workers_id'] != null)
-            .map((wa) => {
-              'workers_id': wa['workers_id'],
-              'quantity': wa['quantity'],
-            })
-            .toList();
+    try {
+      // ---------------------------------------------
+      // 1) Submit worker assignments (DIRECT PUT)
+      // ---------------------------------------------
+      for (final wa in _workerAssignments) {
+        final assignmentId = wa["assignment_id"];
+        final qty = wa["quantity"] ?? 0;
 
-        final body = {
-          'work_order_item_id': widget.workOrderItem.id,
-          'stage_name': widget.stageName,
-          'stage_order': widget.stageOrder,
-          'input_quantity': inputQty,
-          'output_quantity': outputQty,
-          'rejected_quantity': rejectedQty,
-          if (workerAssignments.isNotEmpty) 'worker_assignments': workerAssignments,
-          if (_notesController.text.trim().isNotEmpty) 'notes': _notesController.text.trim(),
-        };
+        if (assignmentId != null) {
+          final response = await ApiService.put(
+            '/api/production/assignments/$assignmentId/submit',
+            {
+              "worker_output_quantity": qty,
+              "admin_rejected_quantity": 0,
+              "worker_notes": ""
+            },
+          );
 
-        final response = await ApiService.completeStage(widget.workOrderId, body);
-        
-        if (response["success"] == true) {
-          Get.back();
-          widget.onSuccess();
-          Get.snackbar("Success", "Stage completed successfully!",
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.green.shade100);
-        } else {
-          Get.snackbar("Error", response["message"] ?? "Failed to complete stage",
-              snackPosition: SnackPosition.BOTTOM,
-              backgroundColor: Colors.red.shade100);
+          if (response["success"] != true) {
+            throw Exception(
+                "Failed to submit worker output for assignment $assignmentId");
+          }
         }
-      } catch (e) {
-        Get.snackbar("Error", "Failed to complete stage: $e",
+      }
+
+      // ---------------------------------------------
+      // 2) Complete stage (your existing API)
+      // ---------------------------------------------
+      final workerAssignments = _workerAssignments
+          .where((wa) => wa['workers_id'] != null)
+          .map((wa) => {
+                'workers_id': wa['workers_id'],
+                'quantity': wa['quantity'],
+              })
+          .toList();
+
+      final body = {
+        'work_order_item_id': widget.workOrderItem.id,
+        'stage_name': widget.stageName,
+        'stage_order': widget.stageOrder,
+        'input_quantity': inputQty,
+        'output_quantity': outputQty,
+        'rejected_quantity': rejectedQty,
+        if (workerAssignments.isNotEmpty) 'worker_assignments': workerAssignments,
+        if (_notesController.text.trim().isNotEmpty)
+          'notes': _notesController.text.trim(),
+      };
+
+      final response =
+          await ApiService.completeStage(widget.workOrderId, body);
+
+      if (response["success"] == true) {
+        Get.back();
+        widget.onSuccess();
+        Get.snackbar("Success", "Stage completed successfully!",
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.green.shade100);
+      } else {
+        Get.snackbar("Error", response["message"] ?? "Failed to complete stage",
             snackPosition: SnackPosition.BOTTOM,
             backgroundColor: Colors.red.shade100);
-      } finally {
-        setState(() => _isSubmitting = false);
       }
+    } catch (e) {
+      Get.snackbar("Error", "Failed to complete stage: $e",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
+    } finally {
+      setState(() => _isSubmitting = false);
     }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -359,23 +389,27 @@ class _CompleteStageModalState extends State<CompleteStageModal> {
                             const SizedBox(height: 16),
                             
                             // Worker Assignments
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text(
-                                  "Worker Assignments (Optional)",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (widget.existingStageData == null)
-                                  IconButton(
-                                    icon: const Icon(Icons.add, color: Color(0xFFFF6F00)),
-                                    onPressed: _addWorker,
-                                  ),
-                              ],
-                            ),
+                         Row(
+  children: [
+    Flexible(
+      child: Text(
+        "Worker Assignments (Optional)",
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        softWrap: false,
+        overflow: TextOverflow.fade,
+      ),
+    ),
+    if (widget.existingStageData == null)
+      IconButton(
+        icon: const Icon(Icons.add, color: Color(0xFFFF6F00)),
+        onPressed: _addWorker,
+      ),
+  ],
+),
+
                             const SizedBox(height: 8),
                             
                             // Worker Assignment List

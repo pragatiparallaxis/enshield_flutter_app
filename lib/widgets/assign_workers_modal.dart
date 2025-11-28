@@ -45,46 +45,66 @@ class _AssignWorkersModalState extends State<AssignWorkersModal> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    try {
-      // Load workers
-      final workersResponse = await ApiService.getWorkers();
-      if (workersResponse["success"] == true && workersResponse["data"] != null) {
-        _workers = (workersResponse["data"] as List)
-            .where((w) => w['is_active'] == true)
-            .map((item) => models.Worker.fromJson(item))
-            .toList();
-      }
+Future<void> _loadData() async {
+  setState(() => _isLoading = true);
 
-      // Load inventory items
-      final inventoryResponse = await ApiService.getInventoryItemsForManagement();
-      if (inventoryResponse["success"] == true && inventoryResponse["data"] != null) {
-        _inventoryItems = (inventoryResponse["data"] as List)
-            .where((item) => (item['available'] ?? 0) > 0) // Only show items with available quantity
-            .map((item) => models.InventoryItem.fromJson(item))
-            .toList();
-      }
-
-      // Load existing assignments
-      final assignmentsResponse = await ApiService.getStageWorkerAssignments(
-        widget.workOrderId,
-        widget.stageId,
-      );
-      if (assignmentsResponse["success"] == true && assignmentsResponse["data"] != null) {
-        _assignments = (assignmentsResponse["data"] as List)
-            .map((item) => models.WorkerAssignment.fromJson(item))
-            .toList();
-        _updateRemainingQuantity();
-      }
-    } catch (e) {
-      Get.snackbar("Error", "Failed to load data: $e",
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.red.shade100);
-    } finally {
-      setState(() => _isLoading = false);
+  try {
+    // Load workers
+    final workersResponse = await ApiService.getWorkers();
+    if (workersResponse["success"] == true && workersResponse["data"] != null) {
+      _workers = (workersResponse["data"] as List)
+          .where((w) => w['is_active'] == true)
+          .map((item) => models.Worker.fromJson(item))
+          .toList();
     }
+
+    // Load inventory items
+    final inventoryResponse = await ApiService.getInventoryItemsForManagement();
+    if (inventoryResponse["success"] == true && inventoryResponse["data"] != null) {
+      _inventoryItems = (inventoryResponse["data"] as List)
+          .where((item) => (item['available'] ?? 0) > 0)
+          .map((item) => models.InventoryItem.fromJson(item))
+          .toList();
+    }
+
+    // Load existing assignments
+    final assignmentsResponse = await ApiService.getStageWorkerAssignments(
+      widget.workOrderId,
+      widget.stageId,
+    );
+
+    if (assignmentsResponse["success"] == true && assignmentsResponse["data"] != null) {
+      _assignments = (assignmentsResponse["data"] as List)
+          .map((item) => models.WorkerAssignment.fromJson(item))
+          .toList();
+      _updateRemainingQuantity();
+    }
+
+    // ⭐ AUTO ADD ONE ROW ONLY AFTER EVERYTHING IS LOADED
+    if (_assignments.isEmpty && _workers.isNotEmpty) {
+      final stageIdInt = int.tryParse(widget.stageId) ?? 0;
+      _assignments.add(models.WorkerAssignment(
+        id: 0,
+        work_order_stages_id: stageIdInt,
+        workers_id: _workers.first.id,
+        quantity: 0,
+        status: 'assigned',
+        worker_output_quantity: 0,
+        admin_approved_quantity: 0,
+      ));
+      _assignmentInventory[0] = [];
+      _updateRemainingQuantity();
+    }
+
+  } catch (e) {
+    Get.snackbar("Error", "Failed to load data: $e",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red.shade100);
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
+
 
   void _updateRemainingQuantity() {
     final assignedTotal = _assignments.fold<int>(
@@ -642,8 +662,8 @@ class _AssignWorkersModalState extends State<AssignWorkersModal> {
                                         );
                                         
                                         return Container(
-                                          margin: const EdgeInsets.only(bottom: 8),
-                                          padding: const EdgeInsets.all(12),
+                                          margin: const EdgeInsets.only(bottom: 4),
+                                          padding: const EdgeInsets.all(4),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFF0A0B12),
                                             borderRadius: BorderRadius.circular(6),

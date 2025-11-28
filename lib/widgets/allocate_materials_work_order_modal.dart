@@ -23,6 +23,7 @@ class CategorySizePair {
   final String categoryName;
   final String sizeId;
   final String sizeName;
+  
 
   CategorySizePair({
     required this.categoryId,
@@ -51,7 +52,8 @@ class ItemQuantity {
 class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkOrderModal> {
   final _formKey = GlobalKey<FormState>();
   bool _showConfirmation = false;
-  
+  List<TextEditingController> _controllers = [];
+
   String? _selectedFabric;
   String? _selectedColor;
   String? _selectedInventoryId;
@@ -90,6 +92,7 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
   @override
   void initState() {
     super.initState();
+    _tableLengthController.text = "11.2";
     _loadData();
   }
 
@@ -322,16 +325,25 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
     super.dispose();
   }
 
-  void _calculateLayers() {
-    final totalMeters = double.tryParse(_totalMetersController.text);
-    final tableLength = double.tryParse(_tableLengthController.text);
-    
-    if (totalMeters != null && tableLength != null && tableLength > 0) {
-      setState(() {
-        _calculatedLayers = totalMeters / tableLength;
-      });
-    }
+void _calculateLayers() {
+  final totalMeters = double.tryParse(_totalMetersController.text);
+  final tableLength = double.tryParse(_tableLengthController.text);
+
+  if (totalMeters != null && tableLength != null && tableLength > 0) {
+    final layers = totalMeters / tableLength;
+
+    setState(() {
+      _calculatedLayers = layers;
+
+      // 👉 Auto-fill Layers Used
+      _layersUsedController.text = layers.toStringAsFixed(0);
+    });
+
+    // Update quantities because layers changed
+    _calculateItemQuantities();
   }
+}
+
 
   void _handleCategorySelection(String? value) {
     if (value == '__add_category__') {
@@ -541,35 +553,12 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
     });
   }
 
-  void _calculateItemQuantities() {
-    final layersUsed = int.tryParse(_layersUsedController.text) ?? 0;
-    final pairsPerLayerText = _pairsPerLayerController.text.trim();
-    final pairsPerLayer = pairsPerLayerText.isNotEmpty 
-        ? int.tryParse(pairsPerLayerText) ?? 0 
-        : 0;
-    
-    // If pairs_per_layer is not provided or invalid, set quantities to 0
-    // Validation will prevent form submission
-    if (pairsPerLayer <= 0 || layersUsed <= 0 || _categorySizePairs.isEmpty) {
-      setState(() {
-        _itemQuantities = _categorySizePairs.map((pair) {
-          return ItemQuantity(
-            categoryId: pair.categoryId,
-            categoryName: pair.categoryName,
-            sizeId: pair.sizeId,
-            sizeName: pair.sizeName,
-            quantity: 0,
-          );
-        }).toList();
-      });
-      return;
-    }
-    
-    // Calculate quantities: (layers_used * pairs_per_layer) / number_of_items
-    final totalOutput = layersUsed * pairsPerLayer;
-    final totalPairs = _categorySizePairs.length;
-    final quantityPerItem = totalPairs > 0 ? (totalOutput / totalPairs).floor() : 0;
+void _calculateItemQuantities() {
+  final layersUsed = int.tryParse(_layersUsedController.text) ?? 0;
+  final pairsPerLayer = int.tryParse(_pairsPerLayerController.text) ?? 0;
+  final count = _categorySizePairs.length;
 
+  if (layersUsed <= 0 || pairsPerLayer <= 0 || count == 0) {
     setState(() {
       _itemQuantities = _categorySizePairs.map((pair) {
         return ItemQuantity(
@@ -577,11 +566,45 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
           categoryName: pair.categoryName,
           sizeId: pair.sizeId,
           sizeName: pair.sizeName,
-          quantity: quantityPerItem,
+          quantity: 0,
         );
       }).toList();
+      _controllers = List.generate(
+        _itemQuantities.length,
+        (i) => TextEditingController(text: "0"),
+      );
     });
+    return;
   }
+
+  final totalPieces = layersUsed * pairsPerLayer * 2;
+
+  final baseQty = totalPieces ~/ count;
+  int remaining = totalPieces % count;
+
+  _itemQuantities = _categorySizePairs.map((pair) {
+    final qty = baseQty + (remaining > 0 ? 1 : 0);
+    if (remaining > 0) remaining--;
+
+    return ItemQuantity(
+      categoryId: pair.categoryId,
+      categoryName: pair.categoryName,
+      sizeId: pair.sizeId,
+      sizeName: pair.sizeName,
+      quantity: qty,
+    );
+  }).toList();
+
+  // FIX: Update controllers here
+  _controllers = List.generate(
+    _itemQuantities.length,
+    (i) => TextEditingController(
+      text: _itemQuantities[i].quantity.toString(),
+    ),
+  );
+
+  setState(() {});
+}
 
   void _handleQuantityChange(int index, int newQuantity) {
     setState(() {
@@ -589,28 +612,30 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
     });
   }
 
-  void _handleFormSubmit() {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedFabric == null || _selectedInventoryId == null) {
-        Get.snackbar("Error", "Please select fabric and color",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red.shade100);
-        return;
-      }
+void _handleFormSubmit() {
+  if (_formKey.currentState!.validate()) {
 
-      if (_categorySizePairs.isEmpty) {
-        Get.snackbar("Error", "Please add at least one category-size pair",
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Colors.red.shade100);
-        return;
-      }
-
-      _calculateItemQuantities();
-      setState(() {
-        _showConfirmation = true;
-      });
+    if (_selectedFabric == null || _selectedInventoryId == null) {
+      Get.snackbar("Error", "Please select fabric and color",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
+      return;
     }
+
+    if (_categorySizePairs.isEmpty) {
+      Get.snackbar("Error", "Please add at least one category-size pair",
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red.shade100);
+      return;
+    }
+
+    _calculateItemQuantities();
+
+    // 👉 Direct submit – NO confirmation screen
+    _handleConfirmAllocation();
   }
+}
+
 
   Future<void> _handleConfirmAllocation() async {
     if (_itemQuantities.any((item) => item.quantity <= 0)) {
@@ -672,6 +697,7 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
         // Reload inventory items to reflect updated available quantity
         await _loadData();
         Get.back();
+        Navigator.of(context).pop();
         widget.onSuccess();
       }
     } catch (e) {
@@ -693,10 +719,9 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
             width: MediaQuery.of(context).size.width * 0.9,
             constraints: const BoxConstraints(maxHeight: 600),
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _showConfirmation
-                    ? _buildConfirmationView()
-                    : _buildFormView(),
+  ? const Center(child: CircularProgressIndicator())
+  : _buildFormView(),
+
           ),
         ),
         // Create Category Dialog
@@ -981,30 +1006,8 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
                   const SizedBox(height: 16),
                   
                   // Fabric (auto-filled, editable)
-                  TextFormField(
-                    controller: _fabricController,
-                    decoration: _fieldDecoration("Fabric (Auto-filled, editable)"),
-                    style: const TextStyle(color: Colors.white),
-                    readOnly: false,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Color (auto-filled, editable)
-                  TextFormField(
-                    controller: _colorController,
-                    decoration: _fieldDecoration("Color (Auto-filled, editable)"),
-                    style: const TextStyle(color: Colors.white),
-                    readOnly: false,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Fabric Type
-                  TextFormField(
-                    controller: _fabricTypeController,
-                    decoration: _fieldDecoration("Fabric Type (Optional)"),
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                  const SizedBox(height: 16),
+                 
+                 
                   
                   // Total Meters
                   TextFormField(
@@ -1091,97 +1094,193 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
                   const SizedBox(height: 16),
                   
                   // Category-Size Pairs
-                  const Text(
-                    "Category-Size Pairs",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+  const Text(
+  "Category / Size Selection",
+  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+),
+SizedBox(height: 12),
+
+// Category Dropdown
+DropdownButtonFormField<String>(
+  decoration: _fieldDecoration("Select Category"),
+  value: _newCategoryId,
+  dropdownColor: const Color(0xFF0F111A),
+  style: const TextStyle(color: Colors.white),
+  isExpanded: true,
+  items: _getCategoryDropdownItems(),
+  onChanged: (value) {
+    setState(() {
+      _newCategoryId = value;
+      // ❌ DO NOT CLEAR OLD SELECTED SIZES
+      // _categorySizePairs.clear();  <-- REMOVE THIS
+    });
+  },
+),
+SizedBox(height: 16),
+
+// Size Chips Grid (only for selected category)
+if (_newCategoryId != null)
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        "Select Sizes",
+        style: TextStyle(color: Colors.white70),
+      ),
+      SizedBox(height: 8),
+
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+
+        children: _sizes.map((size) {
+          // Has this size been selected previously?
+          final isSelected = _categorySizePairs.any(
+            (p) => p.categoryId == _newCategoryId && p.sizeId == size.id,
+          );
+
+          return FilterChip(
+            selected: isSelected,
+            label: Text(size.name),
+            selectedColor: Colors.orange.withOpacity(0.3),
+            checkmarkColor: Colors.orange,
+            backgroundColor: const Color(0xFF0F111A),
+            labelStyle: TextStyle(
+              color: isSelected ? Colors.orange : Colors.white,
+            ),
+onSelected: (selected) {
+  setState(() {
+    final cat = _categories.firstWhere((c) => c.id == _newCategoryId);
+
+    if (selected) {
+      final newPair = CategorySizePair(
+        categoryId: cat.id,
+        categoryName: cat.name,
+        sizeId: size.id,
+        sizeName: size.name,
+      );
+
+      _categorySizePairs.add(newPair);
+
+      _itemQuantities.add(
+        ItemQuantity(
+          categoryId: cat.id,
+          categoryName: cat.name,
+          sizeId: size.id,
+          sizeName: size.name,
+          quantity: 0,
+        ),
+      );
+    } else {
+      _categorySizePairs.removeWhere(
+        (p) => p.categoryId == _newCategoryId && p.sizeId == size.id,
+      );
+      _itemQuantities.removeWhere(
+        (q) => q.categoryId == _newCategoryId && q.sizeId == size.id,
+      );
+    }
+
+    _calculateItemQuantities();  // 👈 auto-fill here
+  });
+},
+
+
+          );
+        }).toList(),
+      ),
+    ],
+  ),
+
+SizedBox(height: 20),
+
+// Selected items list
+if (_categorySizePairs.isNotEmpty)
+  Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        "Selected Items",
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      SizedBox(height: 8),
+
+      ..._categorySizePairs.asMap().entries.map((entry) {
+        final index = entry.key;
+        final pair = entry.value;
+
+        // find quantity for this category+size
+        ItemQuantity qtyItem = _itemQuantities.firstWhere(
+          (q) =>
+              q.categoryId == pair.categoryId &&
+              q.sizeId == pair.sizeId,
+          orElse: () => ItemQuantity(
+            categoryId: pair.categoryId,
+            categoryName: pair.categoryName,
+            sizeId: pair.sizeId,
+            sizeName: pair.sizeName,
+            quantity: 0,
+          ),
+        );
+
+        return Container(
+          padding: const EdgeInsets.all(10),
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F111A),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  "${pair.categoryName} - ${pair.sizeName}",
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+
+              SizedBox(
+                width: 90,
+                child: TextFormField(
+                 controller: _controllers[index],
+
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Qty",
+                    labelStyle: TextStyle(color: Colors.grey),
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                   ),
-                  const SizedBox(height: 8),
-                  
-                  // Add Pair Section
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: _fieldDecoration("Category"),
-                          value: _getValidCategoryValue(),
-                          dropdownColor: const Color(0xFF0F111A),
-                          style: const TextStyle(color: Colors.white),
-                          isExpanded: true,
-                          items: _getCategoryDropdownItems(),
-                          onChanged: _handleCategorySelection,
-                          selectedItemBuilder: (BuildContext context) {
-                            final items = _getCategoryDropdownItems();
-                            return items.map((item) {
-                              if (item.value == '__add_category__') {
-                                return const Text('+ Add Category', style: TextStyle(color: Colors.orange), overflow: TextOverflow.ellipsis);
-                              }
-                              final categoryId = item.value ?? '';
-                              final category = _categories.firstWhere((c) => c.id == categoryId, orElse: () => _categories.isNotEmpty ? _categories.first : WorkOrderCategory(id: '', name: '', is_active: true));
-                              return Text(category.name, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis);
-                            }).toList();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          decoration: _fieldDecoration("Size"),
-                          value: _getValidSizeValue(),
-                          dropdownColor: const Color(0xFF0F111A),
-                          style: const TextStyle(color: Colors.white),
-                          isExpanded: true,
-                          items: _getSizeDropdownItems(),
-                          onChanged: _handleSizeSelection,
-                          selectedItemBuilder: (BuildContext context) {
-                            final items = _getSizeDropdownItems();
-                            return items.map((item) {
-                              if (item.value == '__add_size__') {
-                                return const Text('+ Add Size', style: TextStyle(color: Colors.orange), overflow: TextOverflow.ellipsis);
-                              }
-                              final sizeId = item.value ?? '';
-                              final size = _sizes.firstWhere((s) => s.id == sizeId, orElse: () => _sizes.isNotEmpty ? _sizes.first : Size(id: '', name: '', is_active: true));
-                              return Text(size.name, style: const TextStyle(color: Colors.white), overflow: TextOverflow.ellipsis);
-                            }).toList();
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: const Icon(Icons.add, color: Colors.orange),
-                        onPressed: _addPair,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Category-Size Pairs List
-                  if (_categorySizePairs.isNotEmpty)
-                    ..._categorySizePairs.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final pair = entry.value;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF0F111A),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                "${pair.categoryName} - ${pair.sizeName}",
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _removePair(index),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                  onChanged: (value) {
+                    int qty = int.tryParse(value) ?? 0;
+
+                    setState(() {
+                      qtyItem.quantity = qty;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+
+      SizedBox(height: 16),
+
+      // Live total
+      Text(
+        "Total: ${_itemQuantities.fold<int>(0, (sum, item) => sum + item.quantity)} pieces",
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    ],
+  ),
+
+
                   
                   const SizedBox(height: 16),
                   
@@ -1216,7 +1315,7 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFF6F00),
                     ),
-                    child: const Text("Next", style: TextStyle(color: Colors.white)),
+                    child: const Text("Confirm", style: TextStyle(color: Colors.white)),
                   ),
                 ),
               ],
@@ -1224,129 +1323,6 @@ class _AllocateMaterialsWorkOrderModalState extends State<AllocateMaterialsWorkO
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildConfirmationView() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AppBar(
-          title: const Text('Confirm Allocation'),
-          backgroundColor: const Color(0xFF1E1E2E),
-          automaticallyImplyLeading: false,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Get.back(),
-            ),
-          ],
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  "Item Breakdown",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ..._itemQuantities.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final item = entry.value;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F111A),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            "${item.categoryName} - ${item.sizeName}",
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 100,
-                          child: TextFormField(
-                            initialValue: item.quantity.toString(),
-                            keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: "Quantity",
-                              labelStyle: TextStyle(color: Colors.grey),
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            ),
-                            onChanged: (value) {
-                              final qty = int.tryParse(value) ?? 0;
-                              _handleQuantityChange(index, qty);
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
-                Text(
-                  "Total: ${_itemQuantities.fold<int>(0, (sum, item) => sum + item.quantity)} pieces",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () {
-                    setState(() {
-                      _showConfirmation = false;
-                    });
-                  },
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.grey),
-                  ),
-                  child: const Text("Back", style: TextStyle(color: Colors.white)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _handleConfirmAllocation,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6F00),
-                  ),
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text("Confirm", style: TextStyle(color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
