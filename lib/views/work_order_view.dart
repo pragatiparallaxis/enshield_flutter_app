@@ -1065,8 +1065,9 @@ class _WorkOrderViewState extends State<WorkOrderView> {
                         }
                         await Get.to(() => StageSubmissionsView(
                               workOrderId: widget.workOrderId,
-                              stageId: stageData.id.toString(),
+                              stageId: stageData?.id?.toString() ?? '0',
                               stageName: stageName,
+                              workOrderItemId: item.id.toString(),
                               onSuccess: () => controller.refresh(),
                             ));
                       },
@@ -1172,6 +1173,7 @@ class _WorkOrderViewState extends State<WorkOrderView> {
                 workOrderId: widget.workOrderId,
                 stageId: stageData!.id.toString(),
                 stageName: stageName,
+                workOrderItemId: item.id.toString(),
                 onSuccess: () => controller.refresh(),
               ));
         },

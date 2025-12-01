@@ -6,6 +6,7 @@ class StageSubmissionsView extends StatefulWidget {
   final String workOrderId;
   final String stageId;
   final String stageName;
+  final String? workOrderItemId;
   final VoidCallback onSuccess;
 
   const StageSubmissionsView({
@@ -13,6 +14,7 @@ class StageSubmissionsView extends StatefulWidget {
     required this.workOrderId,
     required this.stageId,
     required this.stageName,
+    this.workOrderItemId,
     required this.onSuccess,
   });
 
@@ -37,6 +39,8 @@ class _StageSubmissionsViewState extends State<StageSubmissionsView> {
       final response = await ApiService.getStageSubmissions(
         widget.workOrderId,
         widget.stageId,
+        stageName: widget.stageName,
+        workOrderItemId: widget.workOrderItemId,
       );
       if (response["success"] == true && response["data"] != null) {
         setState(() {

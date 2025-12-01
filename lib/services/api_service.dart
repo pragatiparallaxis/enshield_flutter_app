@@ -423,8 +423,15 @@ class ApiService {
   }
 
   /// Get stage submissions
-  static Future<dynamic> getStageSubmissions(String workOrderId, String stageId) async {
-    return await get('/api/production/work-orders/$workOrderId/stages/$stageId/submissions');
+  static Future<dynamic> getStageSubmissions(String workOrderId, String stageId, {String? stageName, String? workOrderItemId}) async {
+    String endpoint = '/api/production/work-orders/$workOrderId/stages/$stageId/submissions';
+    
+    // Add query parameters if stage ID is invalid and we have stage name and item ID
+    if ((stageId == '0' || stageId == 'new' || stageId.isEmpty) && stageName != null && workOrderItemId != null) {
+      endpoint += '?stage_name=$stageName&work_order_item_id=$workOrderItemId';
+    }
+    
+    return await get(endpoint);
   }
 
   /// Finalize stage
